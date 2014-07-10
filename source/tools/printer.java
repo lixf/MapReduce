@@ -65,31 +65,36 @@ public class printer {
         
     }
 
+    //helpers
+    private String bin2str(Object binary){
+        return;
+    }
+
+    private String divData(String data, int index){
+        int period = data.indexOf('.');
+        String first = data.substring(0,period);
+        String second = data.substring(period+1,data.length());
+        return (first+"_"+index+second);
+    }   
 
     //Start the XML printer:
     //Takes in a types and match the one got from params
-    public void printXML(String methodName, ArrayList<String> types) throws IOException {
-        System.out.println("entered printXML request");
+    public void printMapperRequest(String mapperName, Object mapperObj, String data, int index) throws IOException {
+        System.out.println("entered printMapperRequest "+ index+"th node");
+        String content;
         //hard code these
-        String xmlHeader = "<?xml version='1.0'?>\n<methodCall>\n";
-        String name = "<methodName>"+methodName+"</methodName>\n";
-        int numArgs = types.size();
-        String xmlFooter = "</params>\n</methodCall>\n";
-        String content = xmlHeader + name + "<params>\n";
-        
-        System.out.println("parsing params");
-
-        for (int i=0;i<numArgs;i++) {
-            System.out.println("parsing params: "+i);
-            String paramXML = printOneParam(types.get(i),this.params.get(i));
-            //append the next parameter
-            content = content + paramXML;
-        }
+        String xmlHeader = "<?xml version='1.0'?>\n<job>\n";
+        String yourInd = "<index>"+index+"</index>";
+        String yourType = "<type>mapper</type>\n";
+        String name = "<objName>"+mapperName+"</objName>\n";
+        String obj = "<obj>"+bin2str(mapperObj)+"</obj>\n";
+        String yourData = "<data>"+divData(data,index)+"</data>\n";
+      
         //append footer
-        content = content + xmlFooter;
+        content = xmlHeader+yourIdx+yourType+name+obj+yourData+"</job>";
         this.xmlContent = content;
         this.xmlLength = content.length();
-        System.out.println("exited printXML request");
+        System.out.println("exited printMapperRequest");
     }
     
     public void printXML(ArrayList<String> types) throws IOException{

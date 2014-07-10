@@ -1,8 +1,9 @@
-/*! Xiaofan Li
- *  15440 Summer 2014
- * \brief This is an implementation of nameNodeServer
- *        start() is main loop, will block
- *        Only parses requests, does not know about config.txt
+/*! @file nameNodeServer.java
+ *  @author Xiaofan Li
+ *  @date 15440 Summer 2014
+ *  @brief This is an implementation of nameNodeServer
+ *         start() is main loop, will block
+ *         Only parses requests, does not know about config.txt
  */
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -22,6 +23,7 @@ public class nameNodeServer implements Runnable {
     private ServerSocket ss;                        //server
     private ArrayList<Socket> dataNodeSoc;          //client
     private ArrayList<String> dataNodeAdr;
+    private ArrayList<Integer> dataRecord;
     private int portIn;
     private int portOut;
 
@@ -34,6 +36,37 @@ public class nameNodeServer implements Runnable {
     private ArrayList<String> types;
     private ArrayList<Object> result;
 
+    //map reduce 
+    private Object mapper;
+    private Object reducer;
+    
+    
+    /* A lot of helper frunctions to simplify life */
+    private InputStream talkTo(int index){
+        //wait for input from dataNodeSoc[index]
+
+    }
+
+
+    private InputStream talkTo(int index, String msg){
+        //write to dataNodeSoc[index] and then wait for reply
+
+
+    }
+
+    //wrapper for generating log files
+    //it doesn't close the printwriter
+    private String initLog(String location) {
+        //initializes log file name
+        long millis = System.currentTimeMillis() % 1000;
+        this.serial = String.valueOf(millis);
+        String path = "../data/"+serial+location+".log";
+        return path;
+    }
+    
+    
+    /* *****************END OF HELPERS******************** */
+    
     //constructor with port specified by config.txt
     public nameNodeServer(int portIn,int portOut,ArrayList<String> dataNodeAdr) {
         this.portIn = portIn;
@@ -52,6 +85,10 @@ public class nameNodeServer implements Runnable {
             e.printStatckTrace();
         }
         System.out.println("connected to all dataNodes, starting to accept requests");
+        for (int i=0;i<dataNodeAdr.length();i++) {
+            //init record
+            this.dataRecord[i] = 0;
+        }
 
         try {
             this.ss = new ServerSocket(this.portIn);
@@ -79,26 +116,23 @@ public class nameNodeServer implements Runnable {
             }
             System.out.println("new client connected");
 
-            //generate a log file
-            long millis = System.currentTimeMillis() % 1000;
-            this.serial = String.valueOf(millis);
-            String path = "../data/"+serial+"_server"+".mix";
-            File log = new File(path);
             //try (with resources) get input stream
             try (
                 BufferedReader in = new BufferedReader(
                     new InputStreamReader (cs.getInputStream()));
             ) {
-                PrintWriter save = new PrintWriter(log);
+                String path = initLog("_name_req");
+                //generate a log file
+                PrintWriter save = new PrintWriter(new File(path));
                 while (!in.ready()){}
                 String temp;
                 //for debugging and logging, write the stream to a file
-                while(!(temp = in.readLine()).contains("</methodCall>")){
+                while(!(temp = in.readLine()).contains("</job>")){
                     save.println(temp);
                 }
                 save.println(temp);
                 save.close(); 
-                System.out.println("save an request at "+path);
+                System.out.println("save a job request at "+path);
                 
                 //parse
                 InputStream toParser = new FileInputStream(path);
@@ -108,11 +142,18 @@ public class nameNodeServer implements Runnable {
                 this.p.parseXML();
                 System.out.println("finished parsing request");
 
-                this.params = p.getParams();
-                handleRequest();
+                this.data = p.getData();
+                //get the transported object and run it
+                this.mapperName = p.getMapperName();
+                this.reducerName = p.getReducerName();
+                this.mapperObj = p.getMapperObj();
+                this.reducerObj = p.getReducerObj();
+                //a bunch of actual calls
+                handleMapper();
+                getMapperResult();
+                handleReducer();
+                getReducerResult();
                 handleSendBack();
-                //close client connection TODO
-                //cs.close();
             } catch (IOException e){
                 System.out.println("reading/Writing problem "+e);
                 return;
@@ -134,61 +175,144 @@ public class nameNodeServer implements Runnable {
     }
 
     //parses and handles the request
-    //uses the stub to handle the conversion of arguments
-    private void handleRequest() {
+    //send the mapper and reduce to data nodes and keep record
+    private void handleMapper() {
+        //form requests to data nodes 
+        printer p = new Printer(this.param,true);
+        //schedule nodes with current job loads
+        //currently not doing anything because not parallel yet
+        ArrayList<int> current;
+
+        for (int i=0;i<dataNodeAdr.length();i++) {
+            //incr record
+            this.dataRecord[i] ++;
+            current.add(i);
+        }
+        
+        //send the requests to each node
+        for (int i=0;i<current.length();i++) {
+           p.printMapperRequest(this.mapperName,this.mapperObj,this.data,i);
+           String request = p.printHTTP();
+
+           //send request
+           //convert the request to InputStream
+           BufferedReader buffedIn = null;
+           try {
+               InputStream stream = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+               buffedIn = new BufferedReader (new InputStreamReader(stream));
+           } catch (IOException e){
+               System.out.println("handle back IO error");
+           }
+           String path = initLog("_mapper_"+i);;
+
+           //get writer and wirte back a bunch 
+           File log = new File(path);
+           try {
+               PrintWriter save = new PrintWriter(log);
+               //get a writer
+               PrintWriter sockout = new PrintWriter(this.dataNodeSoc[i].getOutputStream(),true);
+               //for debugging and logging, write the stream to a file
+               String temp;
+               while((temp = buffedIn.readLine()) != null){
+                   save.println(temp);
+                   sockout.println(temp);
+               }
+               System.out.println("save an result at "+path);
+               System.out.println("finished sending request to data node "+i); 
+           } catch (IOException e){
+               System.out.println("save result error "+e);
+           }
+        }
+
+
+        //get results from mappers
+        for (int i=0;i<current.length();i++) {
+            //generate a log file
+            long millis = System.currentTimeMillis() % 1000;
+            this.serial = String.valueOf(millis);
+            String path = "../data/"+serial+"_name_result.log";
+            File log = new File(path);
+            //try (with resources) get input stream
+            try (
+                BufferedReader in = new BufferedReader(
+                    new InputStreamReader (dataNodeSoc[i].getInputStream()));
+            ) {
+                PrintWriter save = new PrintWriter(log);
+                while (!in.ready()){}
+                String temp;
+                //for debugging and logging, write the stream to a file
+                while(!(temp = in.readLine()).contains("</result>")){
+                    save.println(temp);
+                }
+                save.println(temp);
+                save.close(); 
+                System.out.println("save a result from mapper at "+path);
+                
+                //parse
+                InputStream toParser = new FileInputStream(path);
+                System.out.println("getting result");
+                this.p = new parser(toParser,true);
+                this.p.parseHTTP();
+                this.p.parseXML();
+                System.out.println("finished parsing result");
+                //put results in data structure for reducer
+            }
+        }
+    }
+      /////////////old////////////////////////////
       //we have parser and all its data structures
       //method should be object.method format
-      String method = p.getMethod();
-      System.out.println("serving: "+method);
+      //String method = p.getMethod();
+      //System.out.println("serving: "+method);
 
-      int index = method.indexOf('.');
+      //int index = method.indexOf('.');
 
-      if (index <= 0) {
-        System.out.println("cannot find obj info, aborting");
-        return;
-      }
+      //if (index <= 0) {
+      //  System.out.println("cannot find obj info, aborting");
+      //  return;
+      //}
 
-      String objName = method.substring(0,index);
-      String methodName = method.substring(index+1,method.length());
-      
-      //get stub and call the stub
-      String stubName = objName + "ServerStub";
-      
-      //Class<?> procClass = null;
-      //Constructor<?> procCon = null;
-      Object obj = null;
+      //String objName = method.substring(0,index);
+      //String methodName = method.substring(index+1,method.length());
+      //
+      ////get stub and call the stub
+      //String stubName = objName + "ServerStub";
+      //
+      ////Class<?> procClass = null;
+      ////Constructor<?> procCon = null;
+      //Object obj = null;
 
-      try {
-          obj = Class.forName(stubName).newInstance();
-      } catch (InstantiationException e) {
-          e.printStackTrace();
-      } catch (IllegalArgumentException e) {
-          e.printStackTrace();
-      } catch (ClassNotFoundException e) {
-          e.printStackTrace();
-      } catch (IllegalAccessException e) {
-          e.printStackTrace();
-      }
-          
-          //now pass in the arguments
-      try {
-          Method meth0 = obj.getClass().getMethod("putArgs",ArrayList.class);
-          meth0.invoke(obj,params);
+      //try {
+      //    obj = Class.forName(stubName).newInstance();
+      //} catch (InstantiationException e) {
+      //    e.printStackTrace();
+      //} catch (IllegalArgumentException e) {
+      //    e.printStackTrace();
+      //} catch (ClassNotFoundException e) {
+      //    e.printStackTrace();
+      //} catch (IllegalAccessException e) {
+      //    e.printStackTrace();
+      //}
+      //    
+      //    //now pass in the arguments
+      //try {
+      //    Method meth0 = obj.getClass().getMethod("putArgs",ArrayList.class);
+      //    meth0.invoke(obj,params);
 
-          Method meth1 = obj.getClass().getMethod("execute",String.class);
-          this.result = (ArrayList<Object>)meth1.invoke(obj,methodName);
-          
-          Method meth2 = obj.getClass().getMethod("getTypes");
-          this.types = (ArrayList<String>)meth2.invoke(obj);
-          
-          //and call the method
-          //this returns the xml result
-          //this.result = H.execute(methodName);
-          //this.types = H.getTypes();
-      } catch (Exception e){
-          handleException(e);
-      }
-    }
+      //    Method meth1 = obj.getClass().getMethod("execute",String.class);
+      //    this.result = (ArrayList<Object>)meth1.invoke(obj,methodName);
+      //    
+      //    Method meth2 = obj.getClass().getMethod("getTypes");
+      //    this.types = (ArrayList<String>)meth2.invoke(obj);
+      //    
+      //    //and call the method
+      //    //this returns the xml result
+      //    //this.result = H.execute(methodName);
+      //    //this.types = H.getTypes();
+      //} catch (Exception e){
+      //    handleException(e);
+      //}
+
     
     //send back results from a object
     private void handleSendBack() {

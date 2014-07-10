@@ -1,6 +1,7 @@
-/*! Xiaofan Li
- *  15440 Summer 2014
- * \brief This is an implementation of dataNodeServer
+/*!@file dataNodeServer.java
+ * @author Xiaofan Li
+ * @date 15440 Summer 2014
+ * @brief This is an implementation of dataNodeServer
  *        start() is main loop, will block
  *        Only parses requests, does not know about config.txt
  */
@@ -16,7 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Hashtable;
 import java.util.ArrayList;
 
-/* \brief this is possibly multi-threaded runnable
+/*!@brief this is possibly multi-threaded runnable
  * meaning that one machine could run multiple dataNodes
  * but right now I'm not doing that
  */
@@ -43,30 +44,26 @@ public class dataNodeServer implements Runnable {
             throw new RuntimeException("cannot open port "+port);
         }
         this.stopped = false;
-        System.out.println("server up with port "+ port);
+        System.out.println("data node up with port "+ port);
         params = new ArrayList<Object>();
         result = null;
-        System.out.println("server ready");
+        
+        //wait for name node connection
+        try {
+            cs = this.ss.accept();
+        } catch (IOException e) {
+            throw new RuntimeException ("cannot connect to name node");
+        }
+        System.out.println("data-node: name node connected");
     }
 
     //supports threading
     public void run() {
         while (!this.stopped) {
-            try {
-                cs = this.ss.accept();
-            } catch (IOException e) {
-                if (this.stopped) {
-                    System.out.println("Server Stopped");
-                    return;
-                }
-                throw new RuntimeException ("cannot connect to client");
-            }
-            System.out.println("new client connected");
-
             //generate a log file
             long millis = System.currentTimeMillis() % 1000;
             this.serial = String.valueOf(millis);
-            String path = "../data/"+serial+"_server"+".mix";
+            String path = "../data/"+serial+"_data-node"+".mix";
             File log = new File(path);
             //try (with resources) get input stream
             try (
@@ -77,22 +74,27 @@ public class dataNodeServer implements Runnable {
                 while (!in.ready()){}
                 String temp;
                 //for debugging and logging, write the stream to a file
-                while(!(temp = in.readLine()).contains("</methodCall>")){
+                while(!(temp = in.readLine()).contains("</job>")){
                     save.println(temp);
                 }
                 save.println(temp);
                 save.close(); 
-                System.out.println("save an request at "+path);
+                System.out.println("data-node: save an request at "+path);
                 
                 //parse
                 InputStream toParser = new FileInputStream(path);
-                System.out.println("parsing request");
+                System.out.println("data-node: parsing request");
                 this.p = new parser(toParser,true);
                 this.p.parseHTTP();
                 this.p.parseXML();
-                System.out.println("finished parsing request");
+                System.out.println("data-node: finished parsing request");
+                //get data from parser
+                this.mapper = p.IsMapper();
+                this.idx = p.getMyIndex();
+                this.objName = p.getObjName();
+                this.obj = p.getObject();
+                this.data = p.getMyData();
 
-                this.params = p.getParams();
                 handleRequest();
                 handleSendBack();
                 //close client connection TODO
@@ -122,57 +124,47 @@ public class dataNodeServer implements Runnable {
     private void handleRequest() {
       //we have parser and all its data structures
       //method should be object.method format
-      String method = p.getMethod();
-      System.out.println("serving: "+method);
-
-      int index = method.indexOf('.');
-
-      if (index <= 0) {
-        System.out.println("cannot find obj info, aborting");
-        return;
+      System.out.println("data-node: serving "+this.objName);
+        
+      //hard part
+      Class<?> procClass = null;
+      Constructor<?> procCon = null;
+      ObjHelper H = null;
+      
+      //for dynamically determining the class
+      //find class with string
+      try {
+          procClass = Class.forName(obj);
+      } catch (ClassNotFoundException e) {
+          System.out.println(command + " " + e);
+          System.exit(1);
       }
 
-      String objName = method.substring(0,index);
-      String methodName = method.substring(index+1,method.length());
-      
-      //get stub and call the stub
-      String stubName = objName + "ServerStub";
-      
-      //Class<?> procClass = null;
-      //Constructor<?> procCon = null;
-      Object obj = null;
+      try {
+          procCon = procClass.getConstructor(String[].class);
+      } catch (SecurityException e) {
+          e.printStackTrace();
+      } catch (NoSuchMethodException e) {
+          e.printStackTrace();
+      }
 
       try {
-          obj = Class.forName(stubName).newInstance();
+          Object[] initArgs = new Object[1];
+          initArgs[0] = this.data;
+          H = new ObjHelper((MigratableProcess) procCon.newInstance(initArgs));
       } catch (InstantiationException e) {
           e.printStackTrace();
       } catch (IllegalArgumentException e) {
           e.printStackTrace();
-      } catch (ClassNotFoundException e) {
+      } catch (InvocationTargetException e) {
           e.printStackTrace();
       } catch (IllegalAccessException e) {
           e.printStackTrace();
       }
-          
-          //now pass in the arguments
-      try {
-          Method meth0 = obj.getClass().getMethod("putArgs",ArrayList.class);
-          meth0.invoke(obj,params);
-
-          Method meth1 = obj.getClass().getMethod("execute",String.class);
-          this.result = (ArrayList<Object>)meth1.invoke(obj,methodName);
-          
-          Method meth2 = obj.getClass().getMethod("getTypes");
-          this.types = (ArrayList<String>)meth2.invoke(obj);
-          
-          //and call the method
-          //this returns the xml result
-          //this.result = H.execute(methodName);
-          //this.types = H.getTypes();
-      } catch (Exception e){
-          handleException(e);
-      }
-    }
+      
+      H.start();
+      this.result = H.getResult();
+}
     
     //send back results from a object
     private void handleSendBack() {

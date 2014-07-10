@@ -25,8 +25,12 @@ public class parser {
     private String serverName;
     
     //for xml
-    private String method;
     private String fault;
+    private String mapperName;
+    private String reducerName;
+    private Object mapperObj;
+    private Object reducerObj;
+    private String data;
     private ArrayList<Object> params;
     private ArrayList<Object> result;
 
@@ -87,7 +91,7 @@ public class parser {
             if (index >= 0) {
               index = line.indexOf(':');
               String dataIP = line.substring(index+1,line.length());
-              dataNodeAdr[i] = dataIP;
+              dataNodeAdr.add(i,dataIP);
               i = i+1;
             }  
         }
@@ -183,8 +187,13 @@ public class parser {
             XmlParser px = new XmlParser(stream);
             if (this.request) {
                 px.parseRequest();
-                method = px.getMethod();
-                params = px.getParams();
+
+                //make all the parallel data call
+                this.mapperName = px.getMapperName();
+                this.reducerName = px.getReducerName();
+                this.mapperObj = px.getMapperObj();
+                this.reducerObj = px.getReducerObj();
+                this.data = px.getData;
             }
             else{
                 px.parseResponse();
@@ -195,12 +204,24 @@ public class parser {
         }
     }
     
-    public String getMethod(){
-        return method;
+    public String getMapperName(){
+        return this.mapperName;
+    }
+
+    public String getReducerName(){
+        return this.mapperObj;
     }
     
-    public ArrayList<Object> getParams(){
-        return params;
+    public String getMapperObj(){
+        return this.reducerName;
+    }
+    
+    public String getReducerObj(){
+        return this.reducerObj;
+    }
+    
+    public String getData(){
+        return this.data;
     }
    
     public ArrayList<Object> getResult(){

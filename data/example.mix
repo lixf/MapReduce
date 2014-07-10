@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Connection: close
+Content-Length:120
+Content-Type: text/xml
+
+
+<?xml version='1.0'?>
+<job>
+    <mapper>
+        <mapper-name>wordCount</mapper-name>
+        <mapper-obj></mapper-obj>
+    </mapper>
+    <reducer>
+        <reducer-name>sum</reducer-name>
+        <reducer-obj></reducer-obj>
+    </reducer>
+    <data>book.txt</data>
+<job>

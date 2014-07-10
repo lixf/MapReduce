@@ -8,12 +8,12 @@ import java.io.InputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-public class JavaServer {
+public class JavaDataNode {
 
   public static void main (String [] args) {
      try {
        int port = getPort("../config.txt");
-       System.out.println("Attempting to start XML-RPC Server...");
+       System.out.println("Attempting to start a data node");
        xmlRpcServer server = new dataNodeServer(port);
        server.run();//this will block
      } catch (Exception exception) {
