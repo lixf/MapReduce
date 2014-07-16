@@ -39,6 +39,9 @@ public class parser {
     //am i parsing a request?
     private boolean request;
 
+    //am i parsing for a mapper or reducer?
+    private boolean mapper;
+
 /*!\brief Public constructor 
  */
     public parser (InputStream rawInput,boolean request) {
@@ -82,7 +85,7 @@ public class parser {
     public ArrayList<String> findDataNodeAdr() throws IOException{
         String line;
         int index;
-        ArrayList<String> dataNodeAdr;
+        ArrayList<String> dataNodeAdr = new ArrayList<String>();
         BufferedReader reader = new BufferedReader(new InputStreamReader(rawInput));
         //read line by line until see DataNodeIP :
         int i = 0;
@@ -98,13 +101,13 @@ public class parser {
         return dataNodeAdr;
     }
 
-    public String findServerIP() throws IOException{
+    public String findNameNodeAdr() throws IOException{
         String line;
         int index;
         BufferedReader reader = new BufferedReader(new InputStreamReader(rawInput));
         //read line by line until see Port :
         while ((line = reader.readLine())!=null) {
-            index = line.indexOf("serverIP");
+            index = line.indexOf("NameNodeIP");
             if (index >= 0) {
               index = line.indexOf(':');
               String serverIP = line.substring(index+1,line.length());
@@ -145,6 +148,7 @@ public class parser {
             //length = Integer.parseInt(hp.getHeader("content-length"));
             xmlContent = hp.getContent();
         }
+        System.out.println("exiting parseHTTP");
     }
     
     //define helpers to return desired data
@@ -189,11 +193,12 @@ public class parser {
                 px.parseRequest();
 
                 //make all the parallel data call
+                this.mapper = px.IsMapper();
                 this.mapperName = px.getMapperName();
                 this.reducerName = px.getReducerName();
                 this.mapperObj = px.getMapperObj();
                 this.reducerObj = px.getReducerObj();
-                this.data = px.getData;
+                this.data = px.getData();
             }
             else{
                 px.parseResponse();
@@ -202,6 +207,7 @@ public class parser {
                 this.result = px.getResult();
             }
         }
+        System.out.println("exiting paseXML"+this.mapperName+this.data);
     }
     
     public String getMapperName(){
@@ -209,14 +215,14 @@ public class parser {
     }
 
     public String getReducerName(){
-        return this.mapperObj;
-    }
-    
-    public String getMapperObj(){
         return this.reducerName;
     }
     
-    public String getReducerObj(){
+    public Object getMapperObj(){
+        return this.mapperObj;
+    }
+    
+    public Object getReducerObj(){
         return this.reducerObj;
     }
     
@@ -227,4 +233,35 @@ public class parser {
     public ArrayList<Object> getResult(){
         return result;
     }
+     
+    public boolean IsMapper(){
+        return this.mapper;
+    }
+    
+    //for mappers
+    public int getMyIdx(){
+        int dot = this.data.indexOf('.');
+        int under = this.data.indexOf('_');
+        String index = this.data.substring(under+1,dot);
+        return Integer.valueOf(index);
+    }
+    
+    public String getObjName(){
+        if (this.mapper){
+            return getMapperName();
+        }
+        else{
+            return getReducerName();
+        }
+    }
+    
+    public Object getObject(){
+        if (this.mapper){
+            return getMapperObj();
+        }
+        else{
+            return getReducerObj();
+        }
+    }
+
 }

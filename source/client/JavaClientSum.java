@@ -13,22 +13,20 @@ public class JavaClientSum {
      String configPath = "../config.txt";
      String serverIP = getServerIP(configPath);
      int port = getPort(configPath);
+    
+     //get mapper and reducer
+     CountMapper map = new CountMapper();
+     SumReducer reduce = new SumReducer();
 
-     xmlRpcClient server = new xmlRpcClient(serverIP,port);
+     MapReduceClient server = new MapReduceClient(serverIP,port);
      
      //use for a specific functionality
-     ArrayList<Object> params = new ArrayList<Object>();
-     ArrayList<String> types = new ArrayList<String>();
-     params.add(new Integer(17));
-     params.add(new Integer(13));
+     server.setDataPath("book.txt");
 
-     types.add(0,"int");
-     types.add(1,"int");
-
-     System.out.println("Going to execute RPC call");
+     System.out.println("Going to send request");
      //execute will cause the client to call the client stub
-     Object result =  server.execute("Sum.sum", params,types);
-     System.out.println("RPC call returned");
+     Object result =  server.send("CountMapper",map,"SumReducer",reduce);
+     System.out.println("Name node returned");
      
      //This is returned by the stub
      int sum = Integer.parseInt(result.toString());
@@ -46,7 +44,7 @@ public class JavaClientSum {
         File config = new File(path);
         toParser = new FileInputStream(path);
         parser p = new parser(toParser,true);
-        serverIP = p.findServerIP();
+        serverIP = p.findNameNodeAdr();
     } catch (IOException e){
         System.out.println("server ip error");    
     }
@@ -60,7 +58,7 @@ public class JavaClientSum {
         File config = new File(path);
         toParser = new FileInputStream(path);
         parser p = new parser(toParser,true);
-        port = p.findPort();
+        port = p.findPortIn();
     } catch (IOException e){
         System.out.println("port error");
     }

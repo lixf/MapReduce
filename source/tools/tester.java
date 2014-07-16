@@ -7,15 +7,15 @@ public class tester {
      FileOutputStream out = null;
 
      try {
-        in = new FileInputStream("../../data/small.mix");
+        in = new FileInputStream("../../data/sample.mix");
         out = new FileOutputStream("output.txt");
          
         parser p = new parser((InputStream)in,true);
         p.parseHTTP();
         p.parseXML();
 
-        String userAgent = p.getMethod();
-        System.out.println(userAgent);
+        String mapperName = p.getMapperName();
+        System.out.println(mapperName);
 
      } catch (IOException e) {
         System.out.println(e);

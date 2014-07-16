@@ -18,18 +18,26 @@ public class JavaNameNode {
 
   public static void main (String [] args) {
      try {
+       //default port
+       int portIn = 8080;
+       int portOut = 8081;
+       
        System.out.println("Parsing config file now");
        
        String path = "../config.txt";
-       int portIn,portOut;
        ArrayList<String> dataNodeAdr = null;
        try {
-            File config = new File(path);
             InputStream toParser = new FileInputStream(path);
             parser p = new parser(toParser,false);
             portIn = p.findPortIn();
+
+            toParser = new FileInputStream(path);
+            p = new parser(toParser,false);
             portOut = p.findPortOut();
-            dataNodeAdr = findDataNodeAdr();
+
+            toParser = new FileInputStream(path);
+            p = new parser(toParser,false);
+            dataNodeAdr = p.findDataNodeAdr();
        } catch (IOException e) {
             e.printStackTrace();
        }

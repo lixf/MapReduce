@@ -21,7 +21,9 @@ import java.util.ArrayList;
 public class nameNodeServer implements Runnable {
 
     private ServerSocket ss;                        //server
-    private ArrayList<Socket> dataNodeSoc;          //client
+    private ArrayList<Socket> clientSoc;            //client 
+    private int clientCnt;
+    private ArrayList<Socket> dataNodeSoc;          //client to data node
     private ArrayList<String> dataNodeAdr;
     private ArrayList<Integer> dataRecord;
     private int portIn;
@@ -37,23 +39,13 @@ public class nameNodeServer implements Runnable {
     private ArrayList<Object> result;
 
     //map reduce 
-    private Object mapper;
-    private Object reducer;
+    private Object mapperObj;
+    private Object reducerObj;
+    private String data;
+    private String mapperName;
+    private String reducerName;
     
     
-    /* A lot of helper frunctions to simplify life */
-    private InputStream talkTo(int index){
-        //wait for input from dataNodeSoc[index]
-
-    }
-
-
-    private InputStream talkTo(int index, String msg){
-        //write to dataNodeSoc[index] and then wait for reply
-
-
-    }
-
     //wrapper for generating log files
     //it doesn't close the printwriter
     private String initLog(String location) {
@@ -73,32 +65,41 @@ public class nameNodeServer implements Runnable {
         this.portOut = portOut;
         this.dataNodeAdr = dataNodeAdr;
         this.dataNodeSoc = new ArrayList<Socket>();
+        this.dataRecord = new ArrayList<Integer>();
 
         System.out.println("data copied, ready to connect to data node");
-        System.out.println("connecting to " + dataNodeAdr.length() + " nodes");
+        System.out.println("connecting to " + dataNodeAdr.size() + " nodes");
+        if (dataNodeAdr.size() == 0){
+            System.out.println("no data node info, check config.txt");
+            System.exit(1);
+        }
+        
         try{
-            for (int i=0;i<dataNodeAdr.length();i++) {
-                this.dataNodeSoc[i] = new Socket(this.dataNodeAdr[i],this.portOut);
-                System.out.println("connected to " + i + "th node at " + this.dataNodeAdr[i]);
+            for (int i=0;i<dataNodeAdr.size();i++) {
+                this.dataNodeSoc.add(i,new Socket(this.dataNodeAdr.get(i),this.portOut));
+                System.out.println("connected to " + i + "th node at " + this.dataNodeAdr.get(i));
             }
         } catch (IOException e){
-            e.printStatckTrace();
+            e.printStackTrace();
         }
-        System.out.println("connected to all dataNodes, starting to accept requests");
-        for (int i=0;i<dataNodeAdr.length();i++) {
+        for (int i=0;i<dataNodeAdr.size();i++) {
             //init record
-            this.dataRecord[i] = 0;
+            this.dataRecord.add(i,0);
         }
+        System.out.println("connected to all dataNodes and initialized record");
 
         try {
             this.ss = new ServerSocket(this.portIn);
         } catch (IOException e) {
             e.printStackTrace();
+            System.exit(1);
         }
         this.stopped = false;
-        System.out.println("server up with port "+ port + "initializing data structure");
-        params = new ArrayList<Object>();
-        result = new ArrayList<Object>();
+        System.out.println("server up with port "+ this.portIn + " initializing data structure");
+        this.params = new ArrayList<Object>();
+        this.result = new ArrayList<Object>();
+        this.clientSoc = new ArrayList<Socket>();
+        this.dataRecord = new ArrayList<Integer>();
         System.out.println("server ready");
     }
 
@@ -106,7 +107,8 @@ public class nameNodeServer implements Runnable {
     public void run() {
         while (!this.stopped) {
             try {
-                cs = this.ss.accept();
+                Socket cs = this.ss.accept();
+                this.clientSoc.add(this.clientCnt,cs);
             } catch (IOException e) {
                 if (this.stopped) {
                     System.out.println("Server Stopped");
@@ -114,60 +116,68 @@ public class nameNodeServer implements Runnable {
                 }
                 throw new RuntimeException ("cannot connect to client");
             }
-            System.out.println("new client connected");
+            System.out.println("new client connected: "+this.clientCnt+"th client");
+            handle(this.clientCnt);
+            this.clientCnt++;
+        }
+    }
 
-            //try (with resources) get input stream
-            try (
-                BufferedReader in = new BufferedReader(
-                    new InputStreamReader (cs.getInputStream()));
-            ) {
-                String path = initLog("_name_req");
-                //generate a log file
-                PrintWriter save = new PrintWriter(new File(path));
-                while (!in.ready()){}
-                String temp;
-                //for debugging and logging, write the stream to a file
-                while(!(temp = in.readLine()).contains("</job>")){
-                    save.println(temp);
-                }
+    private void handle(int clientID){
+        //try (with resources) get input stream
+        try (
+            BufferedReader in = new BufferedReader(
+                new InputStreamReader (this.clientSoc.get(clientID).getInputStream()));
+        ) {
+            String path = initLog("_name_req");
+            //generate a log file
+            PrintWriter save = new PrintWriter(new File(path));
+            while (!in.ready()){}
+            String temp;
+            System.out.println("start to accept request from the client");
+
+            //for debugging and logging, write the stream to a file
+            while(!(temp = in.readLine()).contains("</job>")){
+                //System.out.println(temp);
                 save.println(temp);
-                save.close(); 
-                System.out.println("save a job request at "+path);
-                
-                //parse
-                InputStream toParser = new FileInputStream(path);
-                System.out.println("parsing request");
-                this.p = new parser(toParser,true);
-                this.p.parseHTTP();
-                this.p.parseXML();
-                System.out.println("finished parsing request");
-
-                this.data = p.getData();
-                //get the transported object and run it
-                this.mapperName = p.getMapperName();
-                this.reducerName = p.getReducerName();
-                this.mapperObj = p.getMapperObj();
-                this.reducerObj = p.getReducerObj();
-                //a bunch of actual calls
-                handleMapper();
-                getMapperResult();
-                handleReducer();
-                getReducerResult();
-                handleSendBack();
-            } catch (IOException e){
-                System.out.println("reading/Writing problem "+e);
-                return;
             }
+            save.println(temp);
+            save.close(); 
+            System.out.println("save a job request at "+path);
+            
+            //parse
+            InputStream toParser = new FileInputStream(path);
+            System.out.println("parsing request");
+            this.p = new parser(toParser,true);
+            this.p.parseHTTP();
+            this.p.parseXML();
+            System.out.println("finished parsing request");
 
+            this.data = p.getData();
+            //get the transported object and run it
+            this.mapperName = p.getMapperName();
+            this.reducerName = p.getReducerName();
+            this.mapperObj = p.getMapperObj();
+            this.reducerObj = p.getReducerObj();
+            //a bunch of actual calls
+            handleMapper();
+            handleReducer();
+            handleSendBack(clientID);
+        } catch (IOException e){
+            System.out.println("reading/Writing problem "+e);
+            return;
         }
 
     }
 
+
     public void stop() {
       //close server port and free data structures TODO
-      if (cs!=null){
-        try { 
-           cs.close();
+      if (this.clientSoc.size()!=0){
+        try {
+           for (int i=0;i<this.clientSoc.size();i++){
+                this.clientSoc.get(i).close();
+           }
+           this.clientSoc.clear();
         } catch (IOException e){
             System.out.println("socket problem");
         }
@@ -177,31 +187,33 @@ public class nameNodeServer implements Runnable {
     //parses and handles the request
     //send the mapper and reduce to data nodes and keep record
     private void handleMapper() {
+        System.out.println("going to handle mapper");
         //form requests to data nodes 
-        printer p = new Printer(this.param,true);
+        printer p = new printer(true);
         //schedule nodes with current job loads
-        //currently not doing anything because not parallel yet
-        ArrayList<int> current;
-
-        for (int i=0;i<dataNodeAdr.length();i++) {
-            //incr record
-            this.dataRecord[i] ++;
+        ArrayList<Integer> current = new ArrayList<Integer>();
+        
+        //scheduling policy TODO
+        for (int i=0;i<dataNodeAdr.size();i++) {
+            //just use all nodes
             current.add(i);
         }
         
         //send the requests to each node
-        for (int i=0;i<current.length();i++) {
-           p.printMapperRequest(this.mapperName,this.mapperObj,this.data,i);
-           String request = p.printHTTP();
+        System.out.println("going to send mapper req to each mapper");
+        for (int i=0;i<current.size();i++) {
 
            //send request
            //convert the request to InputStream
            BufferedReader buffedIn = null;
            try {
+               p.printMapperRequest(this.mapperName,this.mapperObj,this.data,i);
+               String request = p.printHTTP();
                InputStream stream = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
                buffedIn = new BufferedReader (new InputStreamReader(stream));
            } catch (IOException e){
                System.out.println("handle back IO error");
+               e.printStackTrace();
            }
            String path = initLog("_mapper_"+i);;
 
@@ -210,13 +222,14 @@ public class nameNodeServer implements Runnable {
            try {
                PrintWriter save = new PrintWriter(log);
                //get a writer
-               PrintWriter sockout = new PrintWriter(this.dataNodeSoc[i].getOutputStream(),true);
+               PrintWriter sockout = new PrintWriter(this.dataNodeSoc.get(i).getOutputStream(),true);
                //for debugging and logging, write the stream to a file
                String temp;
                while((temp = buffedIn.readLine()) != null){
                    save.println(temp);
                    sockout.println(temp);
                }
+               save.close();
                System.out.println("save an result at "+path);
                System.out.println("finished sending request to data node "+i); 
            } catch (IOException e){
@@ -226,7 +239,7 @@ public class nameNodeServer implements Runnable {
 
 
         //get results from mappers
-        for (int i=0;i<current.length();i++) {
+        for (int i=0;i<current.size();i++) {
             //generate a log file
             long millis = System.currentTimeMillis() % 1000;
             this.serial = String.valueOf(millis);
@@ -235,7 +248,7 @@ public class nameNodeServer implements Runnable {
             //try (with resources) get input stream
             try (
                 BufferedReader in = new BufferedReader(
-                    new InputStreamReader (dataNodeSoc[i].getInputStream()));
+                    new InputStreamReader (dataNodeSoc.get(i).getInputStream()));
             ) {
                 PrintWriter save = new PrintWriter(log);
                 while (!in.ready()){}
@@ -256,71 +269,24 @@ public class nameNodeServer implements Runnable {
                 this.p.parseXML();
                 System.out.println("finished parsing result");
                 //put results in data structure for reducer
+            } catch (IOException e){
+                e.printStackTrace();
             }
         }
     }
-      /////////////old////////////////////////////
-      //we have parser and all its data structures
-      //method should be object.method format
-      //String method = p.getMethod();
-      //System.out.println("serving: "+method);
 
-      //int index = method.indexOf('.');
+    private void handleReducer(){
+        return;
 
-      //if (index <= 0) {
-      //  System.out.println("cannot find obj info, aborting");
-      //  return;
-      //}
-
-      //String objName = method.substring(0,index);
-      //String methodName = method.substring(index+1,method.length());
-      //
-      ////get stub and call the stub
-      //String stubName = objName + "ServerStub";
-      //
-      ////Class<?> procClass = null;
-      ////Constructor<?> procCon = null;
-      //Object obj = null;
-
-      //try {
-      //    obj = Class.forName(stubName).newInstance();
-      //} catch (InstantiationException e) {
-      //    e.printStackTrace();
-      //} catch (IllegalArgumentException e) {
-      //    e.printStackTrace();
-      //} catch (ClassNotFoundException e) {
-      //    e.printStackTrace();
-      //} catch (IllegalAccessException e) {
-      //    e.printStackTrace();
-      //}
-      //    
-      //    //now pass in the arguments
-      //try {
-      //    Method meth0 = obj.getClass().getMethod("putArgs",ArrayList.class);
-      //    meth0.invoke(obj,params);
-
-      //    Method meth1 = obj.getClass().getMethod("execute",String.class);
-      //    this.result = (ArrayList<Object>)meth1.invoke(obj,methodName);
-      //    
-      //    Method meth2 = obj.getClass().getMethod("getTypes");
-      //    this.types = (ArrayList<String>)meth2.invoke(obj);
-      //    
-      //    //and call the method
-      //    //this returns the xml result
-      //    //this.result = H.execute(methodName);
-      //    //this.types = H.getTypes();
-      //} catch (Exception e){
-      //    handleException(e);
-      //}
-
+    }
     
     //send back results from a object
-    private void handleSendBack() {
+    private void handleSendBack(int clientID) {
         //convert the result to InputStream
-        printer p = new printer(this.result,false);
+        printer p = new printer(false);
         BufferedReader buffedIn = null;
         try {
-            p.printXML(this.types);
+            //p.printXML(this.result,this.types);
             String resultXML = p.printHTTP();
             InputStream stream = new ByteArrayInputStream(resultXML.getBytes(StandardCharsets.UTF_8));
             buffedIn = new BufferedReader (new InputStreamReader(stream));
@@ -336,7 +302,7 @@ public class nameNodeServer implements Runnable {
         try (
             PrintWriter save = new PrintWriter(log);
             //get a writer
-            PrintWriter sockout = new PrintWriter(this.cs.getOutputStream(),true);
+            PrintWriter sockout = new PrintWriter(this.clientSoc.get(clientID).getOutputStream(),true);
         ) {
             //for debugging and logging, write the stream to a file
             String temp;

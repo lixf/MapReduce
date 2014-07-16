@@ -1,0 +1,1 @@
+hi, how could we find the docs that list all the possible properties and functions of array object? I don't mean the Arrays object which is the only docs that I can find.

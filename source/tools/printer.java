@@ -3,14 +3,8 @@
  * \author Xiaofan Li
  */
 
-import java.io.InputStream;
-import java.io.IOException;
-import java.util.Hashtable;
-import java.util.ArrayList;
-import java.nio.charset.StandardCharsets;
-import java.io.ByteArrayInputStream;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.util.*;
 
 public class printer {
     //raw inputs from parent prog
@@ -37,8 +31,7 @@ public class printer {
 
 /*!\brief Public constructor 
  */
-    public printer (ArrayList<Object> params,boolean request) {
-        this.params = params;
+    public printer (boolean request) {
         this.request = request;
     }
 
@@ -66,47 +59,73 @@ public class printer {
     }
 
     //helpers
-    private String bin2str(Object binary){
-        return;
+    private String bin2str(Object binary) throws IOException{
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(binary);
+        oos.close();
+        return new String(Base64Coder.encode(baos.toByteArray()));
     }
 
     private String divData(String data, int index){
         int period = data.indexOf('.');
         String first = data.substring(0,period);
-        String second = data.substring(period+1,data.length());
+        String second = data.substring(period,data.length());
         return (first+"_"+index+second);
     }   
+    
+    public void printClientRequest(String mapperName, Object mapperObj, String reducerName,Object reducerObj, String data) throws IOException {
+        System.out.println("entered printClientRequest");
+        String content;
+        //hard code these
+        String xmlHeader = "<?xml version='1.0'?>\n<job>\n";
+        String mapper = "<mapper>\n" + "<mapper-name>" + mapperName + "</mapperName>\n";
+        String reducer = "<reducer>\n" + "<reducer-name>" + reducerName + "</reducerName>\n";
+        
+        try{
+            mapper = mapper + "<mapperObj>"+bin2str(mapperObj)+"</mapperObj>\n</mapper>\n";
+            reducer = reducer + "<reducerObj>"+bin2str(reducerObj)+"</reducerObj>\n</reducer>\n";
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        
+        String yourData = "<data>"+data+"</data>\n";
+      
+        //append footer
+        content = xmlHeader+mapper+reducer+yourData+"</job>";
+        this.xmlContent = content;
+        this.xmlLength = content.length();
+        System.out.println("exited printClientRequest");
+    }
 
-    //Start the XML printer:
-    //Takes in a types and match the one got from params
     public void printMapperRequest(String mapperName, Object mapperObj, String data, int index) throws IOException {
         System.out.println("entered printMapperRequest "+ index+"th node");
         String content;
         //hard code these
-        String xmlHeader = "<?xml version='1.0'?>\n<job>\n";
-        String yourInd = "<index>"+index+"</index>";
-        String yourType = "<type>mapper</type>\n";
-        String name = "<objName>"+mapperName+"</objName>\n";
-        String obj = "<obj>"+bin2str(mapperObj)+"</obj>\n";
+        String xmlHeader = "<?xml version='1.0'?>\n<DataNodeJob>\n";
+        String yourType = "<mapper>\n";
+        String name = "<mapperName>"+mapperName+"</mapperName>\n";
+        String obj = "<mapperObj>"+bin2str(mapperObj)+"</mapperObj>\n";
+        String endType = "</mapper>\n";
         String yourData = "<data>"+divData(data,index)+"</data>\n";
       
         //append footer
-        content = xmlHeader+yourIdx+yourType+name+obj+yourData+"</job>";
+        content = xmlHeader+yourType+name+obj+endType+yourData+"</DataNodeJob>";
         this.xmlContent = content;
         this.xmlLength = content.length();
         System.out.println("exited printMapperRequest");
     }
     
-    public void printXML(ArrayList<String> types) throws IOException{
+    public void printXML(ArrayList<Object> params,ArrayList<String> types) throws IOException{
         
         System.out.println("entered printXML respond");
-        String xmlHeader = "<?xml version='1.0'?>\n<methodResponse>\n<params>\n";
-        String xmlFooter = "</params>\n</methodResponse>\n";
+        String xmlHeader = "<?xml version='1.0'?>\n<Response>\n<params>\n";
+        String xmlFooter = "</params>\n</Response>\n";
         int numArgs = types.size();
         String content = xmlHeader;
 
         for (int i=0;i<numArgs;i++) {
-            String paramXML = printOneParam(types.get(i),this.params.get(i));
+            String paramXML = printOneParam(types.get(i),params.get(i));
             //append the next parameter
             content = content + paramXML;
         }

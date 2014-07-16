@@ -14,7 +14,7 @@ public class JavaDataNode {
      try {
        int port = getPort("../config.txt");
        System.out.println("Attempting to start a data node");
-       xmlRpcServer server = new dataNodeServer(port);
+       dataNodeServer server = new dataNodeServer(port);
        server.run();//this will block
      } catch (Exception exception) {
        System.err.println("JavaDataNode: " + exception);

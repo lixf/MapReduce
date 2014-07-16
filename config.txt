@@ -2,10 +2,8 @@
 ##This line is a comment line
 
 NameNodePort :8080
-serverIP :128.2.13.161
-          //unix3
 DataNodePort :8081
-DataNodeIP :128.2.13.137
-          //unix4
-DataNodeIP : 128.2.13.133
+NameNodeIP :128.2.13.161
+          //unix3
+DataNodeIP :128.2.13.133
           //unix1

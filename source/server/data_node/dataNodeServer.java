@@ -35,6 +35,13 @@ public class dataNodeServer implements Runnable {
     private ArrayList<String> types;
     private ArrayList<Object> result;
 
+    //map/reduce
+    private int myIdx;
+    private String data;
+    private String objName;
+    private Object obj;
+    private boolean mapper;
+
     //constructor with port specified by main
     public dataNodeServer(int port) {
         this.port = port;
@@ -63,7 +70,7 @@ public class dataNodeServer implements Runnable {
             //generate a log file
             long millis = System.currentTimeMillis() % 1000;
             this.serial = String.valueOf(millis);
-            String path = "../data/"+serial+"_data-node"+".mix";
+            String path = "../data/"+serial+"_data-node"+".log";
             File log = new File(path);
             //try (with resources) get input stream
             try (
@@ -74,7 +81,7 @@ public class dataNodeServer implements Runnable {
                 while (!in.ready()){}
                 String temp;
                 //for debugging and logging, write the stream to a file
-                while(!(temp = in.readLine()).contains("</job>")){
+                while(!(temp = in.readLine()).contains("</DataNodeJob>")){
                     save.println(temp);
                 }
                 save.println(temp);
@@ -90,15 +97,13 @@ public class dataNodeServer implements Runnable {
                 System.out.println("data-node: finished parsing request");
                 //get data from parser
                 this.mapper = p.IsMapper();
-                this.idx = p.getMyIndex();
+                this.myIdx = p.getMyIdx();
                 this.objName = p.getObjName();
                 this.obj = p.getObject();
-                this.data = p.getMyData();
+                this.data = p.getData();
 
                 handleRequest();
                 handleSendBack();
-                //close client connection TODO
-                //cs.close();
             } catch (IOException e){
                 System.out.println("reading/Writing problem "+e);
                 return;
@@ -124,55 +129,31 @@ public class dataNodeServer implements Runnable {
     private void handleRequest() {
       //we have parser and all its data structures
       //method should be object.method format
-      System.out.println("data-node: serving "+this.objName);
-        
-      //hard part
-      Class<?> procClass = null;
-      Constructor<?> procCon = null;
-      ObjHelper H = null;
+      System.out.println("this is number "+ this.myIdx);
+      System.out.println("data-node: serving "+this.objName+ " using data from " + this.data);
       
-      //for dynamically determining the class
-      //find class with string
-      try {
-          procClass = Class.forName(obj);
-      } catch (ClassNotFoundException e) {
-          System.out.println(command + " " + e);
-          System.exit(1);
-      }
+      //just run the object passed in
+      MigratableProcess H = (MigratableProcess) this.obj;
 
       try {
-          procCon = procClass.getConstructor(String[].class);
-      } catch (SecurityException e) {
-          e.printStackTrace();
-      } catch (NoSuchMethodException e) {
-          e.printStackTrace();
-      }
-
-      try {
-          Object[] initArgs = new Object[1];
-          initArgs[0] = this.data;
-          H = new ObjHelper((MigratableProcess) procCon.newInstance(initArgs));
-      } catch (InstantiationException e) {
-          e.printStackTrace();
-      } catch (IllegalArgumentException e) {
-          e.printStackTrace();
-      } catch (InvocationTargetException e) {
-          e.printStackTrace();
-      } catch (IllegalAccessException e) {
-          e.printStackTrace();
+        H.setArgs("../data/"+this.data);
+        H.run();  
+      } catch (Exception e){
+        e.printStackTrace();
       }
       
-      H.start();
       this.result = H.getResult();
-}
-    
+      this.types = H.getTypes();
+    }
+
+
     //send back results from a object
     private void handleSendBack() {
         //convert the result to InputStream
-        printer p = new printer(this.result,false);
+        printer p = new printer(false);
         BufferedReader buffedIn = null;
         try {
-            p.printXML(this.types);
+            p.printXML(this.result,this.types);
             String resultXML = p.printHTTP();
             InputStream stream = new ByteArrayInputStream(resultXML.getBytes(StandardCharsets.UTF_8));
             buffedIn = new BufferedReader (new InputStreamReader(stream));
@@ -185,11 +166,10 @@ public class dataNodeServer implements Runnable {
         //get writer and wirte back a bunch 
         //try (with resources) get input stream
         File log = new File(path);
-        try (
+        try {
             PrintWriter save = new PrintWriter(log);
             //get a writer
             PrintWriter sockout = new PrintWriter(this.cs.getOutputStream(),true);
-        ) {
             //for debugging and logging, write the stream to a file
             String temp;
             while((temp = buffedIn.readLine()) != null){
@@ -197,6 +177,7 @@ public class dataNodeServer implements Runnable {
                 sockout.println(temp);
             }
             System.out.println("save an result at "+path);
+            save.close();
 
             System.out.println("finished sending back result");
             System.out.println("request done\n\n");

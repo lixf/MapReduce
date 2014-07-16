@@ -13,8 +13,7 @@ import java.io.*;
 import java.util.*;
 import java.text.*;
 import java.net.URLDecoder;
-import java.util.Hashtable;
-import java.util.ArrayList;
+import java.lang.ClassNotFoundException;
 
 public class XmlParser {
   private BufferedReader reader;
@@ -27,6 +26,13 @@ public class XmlParser {
   private String fault;
   private ArrayList<Object> result;
 
+  //for data-node
+  private String mapperName;
+  private String reducerName;
+  private Object mapperObj;
+  private Object reducerObj;
+  private String data;
+  private boolean isMapper;
 
   public XmlParser(InputStream is) {
     reader = new BufferedReader(new InputStreamReader(is));
@@ -38,8 +44,6 @@ public class XmlParser {
   public int parseRequest() throws IOException {
     String initial, prms[], cmd[], temp[];
     int ret, indexFront,indexBack, i;
-    boolean seenMethodCall = false;
-    boolean seenMethodName = false;
     ret = 0;
     this.request = true;
 
@@ -58,16 +62,13 @@ public class XmlParser {
         }
         
         //catch method call
-        if (line.substring(indexFront,indexBack).equals("methodCall")){
-            if(seenMethodCall){
-                //error malformed xml
-                return 1;
-            }
-            else {
-                //just use handler
-                ret = parseMethodCall();
-                seenMethodCall = true;
-            }
+        if (line.substring(indexFront,indexBack).equals("job")){
+            //just use handler
+            ret = parseJob();
+        }
+        else if (line.substring(indexFront,indexBack).equals("DataNodeJob")){
+            //just use handler
+            ret = parseDataNodeJob();
         }
         else {
             return 1;
@@ -76,41 +77,132 @@ public class XmlParser {
     return ret;
   }
 
-  private int parseMethodCall() throws IOException{
+  private int parseJob() throws IOException{
+    System.out.println("parsing job");
     int ret, indexFront,indexBack, i;
     String line;
     ret = 0;
 
-    //parse MethodName
+    //parse mapper or reducer
+    line = reader.readLine();
+    indexFront = line.indexOf('<') + 1;
+    indexBack  = line.indexOf('>');
+
+    this.method = line.substring(indexFront,indexBack);
+
+    if (this.method.contains("mapper")){
+        parseMapper();
+        //waste the last line
+        line = reader.readLine();
+        
+        if((line = reader.readLine()).contains("reducer")){
+            parseReducer();
+        }
+        parseData();
+    }
+    else {
+        parseReducer();
+        //waste the last line
+        line = reader.readLine();
+        if((line = reader.readLine()).contains("mapper")){
+            parseMapper();
+        }
+        parseData();
+    }
+    return ret;
+  }
+  
+  private int parseDataNodeJob() throws IOException{
+    System.out.println("parsing data node job");
+    int ret, indexFront,indexBack, i;
+    String line;
+    ret = 0;
+
+    //parse mapper or reducer
+    line = reader.readLine();
+    if (line.contains("mapper")){
+        this.isMapper = true;
+        parseMapper();
+        parseData();
+    }
+    else {
+        this.isMapper = false;
+        parseReducer();
+        parseData();
+    }
+    return ret;
+  }
+  
+  private void parseMapper() throws IOException{
+    System.out.println("parsing mapper");
+    int ret, indexFront,indexBack, i;
+    String line;
+
+    //parse mapper or reducer
     line = reader.readLine();
     indexFront = line.indexOf('>') + 1;
     indexBack  = line.indexOf('/') - 1;
 
-    method = line.substring(indexFront,indexBack);
+    this.mapperName = line.substring(indexFront,indexBack);
+    
+    //read the base64 data
+    line = reader.readLine();
+    indexFront = line.indexOf('>') + 1;
+    indexBack  = line.indexOf('/') - 1;
+    String bin = line.substring(indexFront,indexBack);
 
-    while ((line = reader.readLine()) != null){
-        //example <params>
-        indexFront = line.indexOf('<') + 1;
-        indexBack  = line.indexOf('>');
+    this.mapperObj = string2bin(bin);
+  }
+  
+  private void parseReducer() throws IOException{
+    System.out.println("parsing reducer");
+    int ret, indexFront,indexBack, i;
+    String line;
 
-        //empty bracket?
-        if (indexFront > indexBack) {
-            throw new IOException();
-        }
-        
-        //catch method call
-        if (line.substring(indexFront,indexBack).equals("params")){
-            //just use handler
-            ret = parseParams();
-        }
-        else if (line.substring(indexFront,indexBack).equals("/methodCall")){
-          return ret;
-        }
-        else {
-            return 1;
-        }
+    //parse mapper or reducer
+    line = reader.readLine();
+    indexFront = line.indexOf('>') + 1;
+    indexBack  = line.indexOf('/') - 1;
+
+    this.reducerName = line.substring(indexFront,indexBack);
+    
+    //read the base64 data
+    line = reader.readLine();
+    indexFront = line.indexOf('>') + 1;
+    indexBack  = line.indexOf('/') - 1;
+    String bin = line.substring(indexFront,indexBack);
+
+    this.reducerObj = string2bin(bin);
+  }
+
+  private Object string2bin(String st) throws IOException{
+    byte [] data = Base64Coder.decode(st);
+    ObjectInputStream ois = new ObjectInputStream( 
+                            new ByteArrayInputStream(data));
+    Object o = null;
+    try{
+        o = ois.readObject();
+    } catch (ClassNotFoundException e){
+        e.printStackTrace();
     }
-    return ret;
+
+    ois.close();
+    return o;
+  }
+
+  private void parseData() throws IOException{
+    System.out.println("paring data path");
+    int ret, indexFront,indexBack, i;
+    String line;
+
+    //skip a line
+    line = reader.readLine();
+    line = reader.readLine();
+
+    indexFront = line.indexOf('>') + 1;
+    indexBack  = line.indexOf('/') - 1;
+
+    this.data = line.substring(indexFront,indexBack);
   }
 
 
@@ -306,4 +398,27 @@ public class XmlParser {
     return this.result;
   }
 
+  public boolean IsMapper(){
+    return this.isMapper;
+  }
+  
+  public String getMapperName() {
+    return this.mapperName;
+  }
+
+  public String getReducerName() {
+    return this.reducerName;
+  }
+
+  public String getData() {
+    return this.data;
+  }
+
+  public Object getMapperObj(){
+    return this.mapperObj;
+  }
+  
+  public Object getReducerObj(){
+    return this.reducerObj;
+  }
 }
