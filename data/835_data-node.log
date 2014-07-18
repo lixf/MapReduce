@@ -1,0 +1,16 @@
+POST /RPC2 HTTP/1.0
+User-Agent: kali
+Host:
+Content-Type: text/xml
+Content-length:254
+
+
+
+<?xml version='1.0'?>
+<DataNodeJob>
+<mapper>
+<mapperName>CountMapper</mapperName>
+<mapperObj>rO0ABXNyAAtDb3VudE1hcHBlcgAAAAAAAAABAgACSQAFY291bnRMAARkYXRhdAASTGphdmEvbGFuZy9TdHJpbmc7eHAAAAAAcA==</mapperObj>
+</mapper>
+<data>book_0.txt</data>
+</DataNodeJob>

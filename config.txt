@@ -3,7 +3,7 @@
 
 NameNodePort :8080
 DataNodePort :8081
-NameNodeIP :128.2.13.161
-          //unix3
-DataNodeIP :128.2.13.133
+NameNodeIP :128.2.13.133
           //unix1
+DataNodeIP :128.2.13.137
+          //unix4

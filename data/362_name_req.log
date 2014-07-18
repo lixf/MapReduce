@@ -1,0 +1,20 @@
+POST /RPC2 HTTP/1.0
+User-Agent: kali
+Host:
+Content-Type: text/xml
+Content-length:419
+
+
+
+<?xml version='1.0'?>
+<job>
+<mapper>
+<mapper-name>CountMapper</mapperName>
+<mapperObj>rO0ABXNyAAtDb3VudE1hcHBlcgAAAAAAAAABAgACSQAFY291bnRMAARkYXRhdAASTGphdmEvbGFuZy9TdHJpbmc7eHAAAAAAcA==</mapperObj>
+</mapper>
+<reducer>
+<reducer-name>SumReducer</reducerName>
+<reducerObj>rO0ABXNyAApTdW1SZWR1Y2VyAAAAAAAAAAECAAJJAANzdW1MAARkYXRhdAASTGphdmEvbGFuZy9TdHJpbmc7eHAAAAAAcA==</reducerObj>
+</reducer>
+<data>book.txt</data>
+</job>

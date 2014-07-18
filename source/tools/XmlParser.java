@@ -25,6 +25,7 @@ public class XmlParser {
     
   private String fault;
   private ArrayList<Object> result;
+  private ArrayList<String> types;
 
   //for data-node
   private String mapperName;
@@ -38,6 +39,8 @@ public class XmlParser {
     reader = new BufferedReader(new InputStreamReader(is));
     method = "";
     params = new ArrayList<Object>();
+    this.result = new ArrayList<Object> ();
+    this.types = new ArrayList<String> ();
   }
 
   //return int non-zero for error  
@@ -107,7 +110,9 @@ public class XmlParser {
         if((line = reader.readLine()).contains("mapper")){
             parseMapper();
         }
-        parseData();
+        else if (line.contains("params")){
+        
+        }
     }
     return ret;
   }
@@ -128,7 +133,10 @@ public class XmlParser {
     else {
         this.isMapper = false;
         parseReducer();
-        parseData();
+        line = reader.readLine();
+        if ((line=reader.readLine()).contains("params")){
+            ret = parseParams();
+        }
     }
     return ret;
   }
@@ -208,18 +216,16 @@ public class XmlParser {
 
   //return int non-zero for error  
   public int parseResponse() throws IOException {
+    System.out.println("parsing response");
     String initial, prms[], cmd[], temp[];
     int ret, indexFront,indexBack, i;
-    boolean seenMethodResponse = false;
     ret = 0;
     this.request = false;
-    this.result = new ArrayList<Object> ();
 
     //start parsing, skip comment on first line
     String line = reader.readLine();
 
     while ((line = reader.readLine()) != null){
-        //example <methodResponse>
         indexFront = line.indexOf('<') + 1;
         indexBack  = line.indexOf('>');
 
@@ -229,16 +235,9 @@ public class XmlParser {
         }
         
         //catch method call
-        if (line.substring(indexFront,indexBack).equals("methodResponse")){
-            if(seenMethodResponse){
-                //error malformed xml
-                return 1;
-            }
-            else {
-                //just use handler
-                ret = parseMethodResponse();
-                seenMethodResponse = true;
-            }
+        if (line.substring(indexFront,indexBack).equals("Response")){
+            //just use handler
+            ret = parseMethodResponse();
         }
         else {
             return 1;
@@ -272,7 +271,7 @@ public class XmlParser {
         else if (line.substring(indexFront,indexBack).equals("fault")){
             ret = parseFault(); //TODO
         }
-        else if (line.substring(indexFront,indexBack).equals("/methodCall")){
+        else if (line.substring(indexFront,indexBack).equals("/Response")){
           return ret;
         }
         else {
@@ -288,6 +287,7 @@ public class XmlParser {
 
 
   private int parseParams() throws IOException{
+    System.out.println("parsing params");
     int ret, indexFront,indexBack, i;
     String line;
     ret = 0;
@@ -319,6 +319,7 @@ public class XmlParser {
 
 
   private int parseOneParam() throws IOException{
+    System.out.println("parsing one param");
     int ret, indexFront,indexBack, i;
     String line;
     
@@ -340,6 +341,14 @@ public class XmlParser {
         indexBack  = sub.indexOf(">");
         String type = sub.substring(indexFront,indexBack);
         int typelen = type.length();
+        if (type.contains("i4")){
+           this.types.add("Integer");
+        }else if (type.contains("string")){
+           this.types.add("String");
+        }else {
+           this.types.add("Boolean");
+        }
+
         
         //malformed xml
         if (indexFront > indexBack) {
@@ -352,6 +361,15 @@ public class XmlParser {
         indexFront = sub.indexOf(delimFront) + 1;
         indexBack  = sub.indexOf(delimBack);
         String value = sub.substring(indexFront+typelen+1,indexBack);
+        Object o = null;
+
+        if (type.contains("i4")){
+           o = (Object) Integer.valueOf(value);
+        }else if (type.contains("string")){
+           o = (Object) value;
+        }else {
+           o = (Object) Boolean.valueOf(value);
+        }
         
         //malformed xml
         if (indexFront > indexBack) {
@@ -360,7 +378,7 @@ public class XmlParser {
         
         //put in hashtable
         if (this.request) {
-            params.add(value);
+            params.add(o);
         }
         else {
             this.result.add(0,value);
@@ -396,6 +414,10 @@ public class XmlParser {
 
   public ArrayList<Object> getResult(){
     return this.result;
+  }
+
+  public ArrayList<String> getTypes(){
+    return this.types;
   }
 
   public boolean IsMapper(){

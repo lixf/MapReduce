@@ -33,6 +33,7 @@ public class parser {
     private String data;
     private ArrayList<Object> params;
     private ArrayList<Object> result;
+    private ArrayList<String> types;
 
     private String xmlContent;
 
@@ -199,15 +200,18 @@ public class parser {
                 this.mapperObj = px.getMapperObj();
                 this.reducerObj = px.getReducerObj();
                 this.data = px.getData();
+                this.params = px.getParams();
+                this.types = px.getTypes();
             }
             else{
                 px.parseResponse();
                 //empty if no fault otherwise return the fault as string
                 this.fault = px.getFault();
                 this.result = px.getResult();
+                this.types = px.getTypes();
             }
         }
-        System.out.println("exiting paseXML"+this.mapperName+this.data);
+        System.out.println("exiting parseXML");
     }
     
     public String getMapperName(){
@@ -231,7 +235,15 @@ public class parser {
     }
    
     public ArrayList<Object> getResult(){
-        return result;
+        return this.result;
+    }
+    
+    public ArrayList<Object> getParams(){
+        return this.params;
+    }
+
+    public ArrayList<String> getTypes(){
+        return this.types;
     }
      
     public boolean IsMapper(){

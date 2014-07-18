@@ -37,6 +37,8 @@ public class nameNodeServer implements Runnable {
     private ArrayList<Object> params;
     private ArrayList<String> types;
     private ArrayList<Object> result;
+    private ArrayList<String> final_types;
+    private ArrayList<Object> final_result;
 
     //map reduce 
     private Object mapperObj;
@@ -44,6 +46,7 @@ public class nameNodeServer implements Runnable {
     private String data;
     private String mapperName;
     private String reducerName;
+    private String reducerRequest;
     
     
     //wrapper for generating log files
@@ -98,6 +101,9 @@ public class nameNodeServer implements Runnable {
         System.out.println("server up with port "+ this.portIn + " initializing data structure");
         this.params = new ArrayList<Object>();
         this.result = new ArrayList<Object>();
+        this.types = new ArrayList<String>();
+        this.final_result = new ArrayList<Object>();
+        this.final_types = new ArrayList<String>();
         this.clientSoc = new ArrayList<Socket>();
         this.dataRecord = new ArrayList<Integer>();
         System.out.println("server ready");
@@ -246,15 +252,14 @@ public class nameNodeServer implements Runnable {
             String path = "../data/"+serial+"_name_result.log";
             File log = new File(path);
             //try (with resources) get input stream
-            try (
+            try {
                 BufferedReader in = new BufferedReader(
                     new InputStreamReader (dataNodeSoc.get(i).getInputStream()));
-            ) {
                 PrintWriter save = new PrintWriter(log);
                 while (!in.ready()){}
                 String temp;
                 //for debugging and logging, write the stream to a file
-                while(!(temp = in.readLine()).contains("</result>")){
+                while(!(temp = in.readLine()).contains("</Response>")){
                     save.println(temp);
                 }
                 save.println(temp);
@@ -264,9 +269,11 @@ public class nameNodeServer implements Runnable {
                 //parse
                 InputStream toParser = new FileInputStream(path);
                 System.out.println("getting result");
-                this.p = new parser(toParser,true);
+                this.p = new parser(toParser,false);
                 this.p.parseHTTP();
                 this.p.parseXML();
+                this.types.addAll(this.p.getTypes());
+                this.result.addAll(this.p.getResult());
                 System.out.println("finished parsing result");
                 //put results in data structure for reducer
             } catch (IOException e){
@@ -276,8 +283,83 @@ public class nameNodeServer implements Runnable {
     }
 
     private void handleReducer(){
-        return;
+        System.out.println("going to handle reducer");
+        //form requests to data node
+        printer p = new printer(true);
+        //schedule nodes with current job loads
+        ArrayList<Integer> current = new ArrayList<Integer>();
+        
+        //send the requests to each node
+        System.out.println("going to send reducer req to 0th data node");
+           
+        //send request
+        //convert the request to InputStream
+        BufferedReader buffedIn = null;
+        try {
+            p.printReducerRequest(this.reducerName,this.reducerObj,
+                                                 this.result,this.types);
+            String request = p.printHTTP();
+            InputStream stream = new ByteArrayInputStream(request.getBytes(StandardCharsets.UTF_8));
+            buffedIn = new BufferedReader (new InputStreamReader(stream));
+        } catch (IOException e){
+            System.out.println("handle back IO error");
+            e.printStackTrace();
+        }
+        String path = initLog("_reducer");;
 
+        //get writer and wirte back a bunch 
+        File log = new File(path);
+        try {
+            PrintWriter save = new PrintWriter(log);
+            //get a writer
+            PrintWriter sockout = new PrintWriter(this.dataNodeSoc.get(0).getOutputStream(),true);
+            //for debugging and logging, write the stream to a file
+            String temp;
+            while((temp = buffedIn.readLine()) != null){
+                save.println(temp);
+                sockout.println(temp);
+            }
+            save.close();
+            System.out.println("save an request at "+path);
+            System.out.println("finished sending request to data node"); 
+        } catch (IOException e){
+            System.out.println("save request error "+e);
+        }
+
+        //generate a log file
+        long millis = System.currentTimeMillis() % 1000;
+        this.serial = String.valueOf(millis);
+        path = initLog("_name_result");
+        File log2 = new File(path);
+        //try (with resources) get input stream
+        try {
+            BufferedReader in = new BufferedReader(
+                new InputStreamReader (dataNodeSoc.get(0).getInputStream()));
+            PrintWriter save = new PrintWriter(log2);
+            while (!in.ready()){}
+            String temp;
+            //for debugging and logging, write the stream to a file
+            while(!(temp = in.readLine()).contains("</Response>")){
+                save.println(temp);
+            }
+            save.println(temp);
+            save.close(); 
+            System.out.println("save a result from reducer at "+path);
+            
+            //parse
+            InputStream toParser = new FileInputStream(path);
+            System.out.println("getting result");
+            this.p = new parser(toParser,false);
+            this.p.parseHTTP();
+            this.p.parseXML();
+            this.final_types = this.p.getTypes();
+            this.final_result = this.p.getResult();
+            System.out.println("finished parsing result");
+            //put results in data structure for reducer
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        return;
     }
     
     //send back results from a object
@@ -286,7 +368,7 @@ public class nameNodeServer implements Runnable {
         printer p = new printer(false);
         BufferedReader buffedIn = null;
         try {
-            //p.printXML(this.result,this.types);
+            p.printXML(this.final_result,this.final_types);
             String resultXML = p.printHTTP();
             InputStream stream = new ByteArrayInputStream(resultXML.getBytes(StandardCharsets.UTF_8));
             buffedIn = new BufferedReader (new InputStreamReader(stream));
@@ -299,19 +381,19 @@ public class nameNodeServer implements Runnable {
         //get writer and wirte back a bunch 
         //try (with resources) get input stream
         File log = new File(path);
-        try (
+        try {
             PrintWriter save = new PrintWriter(log);
             //get a writer
             PrintWriter sockout = new PrintWriter(this.clientSoc.get(clientID).getOutputStream(),true);
-        ) {
             //for debugging and logging, write the stream to a file
             String temp;
             while((temp = buffedIn.readLine()) != null){
                 save.println(temp);
                 sockout.println(temp);
             }
+            save.close();
+            sockout.close();
             System.out.println("save an result at "+path);
-
             System.out.println("finished sending back result");
             System.out.println("request done\n\n");
         } catch (IOException e){

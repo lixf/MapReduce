@@ -67,16 +67,16 @@ public class dataNodeServer implements Runnable {
     //supports threading
     public void run() {
         while (!this.stopped) {
+            System.out.println("running");
             //generate a log file
             long millis = System.currentTimeMillis() % 1000;
             this.serial = String.valueOf(millis);
             String path = "../data/"+serial+"_data-node"+".log";
             File log = new File(path);
             //try (with resources) get input stream
-            try (
+            try {
                 BufferedReader in = new BufferedReader(
                     new InputStreamReader (cs.getInputStream()));
-            ) {
                 PrintWriter save = new PrintWriter(log);
                 while (!in.ready()){}
                 String temp;
@@ -94,13 +94,22 @@ public class dataNodeServer implements Runnable {
                 this.p = new parser(toParser,true);
                 this.p.parseHTTP();
                 this.p.parseXML();
-                System.out.println("data-node: finished parsing request");
                 //get data from parser
-                this.mapper = p.IsMapper();
-                this.myIdx = p.getMyIdx();
-                this.objName = p.getObjName();
-                this.obj = p.getObject();
-                this.data = p.getData();
+                this.mapper = this.p.IsMapper();
+                System.out.println("is mapper?"+this.mapper);
+                this.objName = this.p.getObjName();
+                System.out.println(this.objName);
+                this.obj = this.p.getObject();
+                if (this.mapper){
+                    this.data = this.p.getData();
+                    this.myIdx = this.p.getMyIdx();
+                } else {
+                    this.result = this.p.getParams();
+                    this.types = this.p.getTypes();
+                System.out.println((int)this.result.get(0));
+
+                }
+                System.out.println("data-node: finished parsing request");
 
                 handleRequest();
                 handleSendBack();
@@ -129,21 +138,34 @@ public class dataNodeServer implements Runnable {
     private void handleRequest() {
       //we have parser and all its data structures
       //method should be object.method format
-      System.out.println("this is number "+ this.myIdx);
-      System.out.println("data-node: serving "+this.objName+ " using data from " + this.data);
+      System.out.println("data-node: serving "+this.objName);
       
       //just run the object passed in
-      MigratableProcess H = (MigratableProcess) this.obj;
-
-      try {
-        H.setArgs("../data/"+this.data);
-        H.run();  
-      } catch (Exception e){
-        e.printStackTrace();
+      if (this.mapper){
+        Mapper H = (Mapper) this.obj;
+        try {
+          H.setArgs("../data/"+this.data);
+          H.run();  
+        } catch (Exception e){
+          e.printStackTrace();
+        }
+        
+        this.result = H.getResult();
+        this.types = H.getTypes();
+      } 
+      else {
+        Reducer H = (Reducer) this.obj;
+        try {
+          H.setArgs(this.result,this.types);
+          H.run();  
+        } catch (Exception e){
+          e.printStackTrace();
+        }
+        
+        this.result = H.getResult();
+        this.types = H.getTypes();
       }
-      
-      this.result = H.getResult();
-      this.types = H.getTypes();
+
     }
 
 

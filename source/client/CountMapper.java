@@ -12,7 +12,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 
-public class CountMapper implements MigratableProcess{
+public class CountMapper implements Mapper{
     
     private String data;
     private int count;

@@ -4,18 +4,27 @@ import java.lang.Runnable;
 import java.util.ArrayList;
 import java.io.*;
 
-public class SumReducer implements MigratableProcess{
+public class SumReducer implements Reducer{
 
     private int sum;
     private String data;
+    private ArrayList<Object> param;
+    private ArrayList<String> param_types;
+    private ArrayList<Object> result;
+    private ArrayList<String> result_types;
     private final static long serialVersionUID = 1;
 
     public SumReducer(){
-        sum = 0;
+        this.param = new ArrayList<Object>();
+        this.param_types = new ArrayList<String>();
+        this.result = new ArrayList<Object>();
+        this.result_types = new ArrayList<String>();
+        this.sum = 0;
     }
 
-    public void setArgs(String data){
-        this.data = data;
+    public void setArgs(ArrayList<Object> param, ArrayList<String> types){
+        this.param = param;
+        this.param_types = types;
     }
     
     private int count_line(String input){
@@ -28,16 +37,17 @@ public class SumReducer implements MigratableProcess{
     }
 
     public void run(){
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(this.data)));
-            String line;
-            while ((line = reader.readLine()) !=null){
-                int curr = count_line(line);
-                this.sum =+ curr;
+        for (int i=0;i<this.param.size();i++){
+            if (!this.param_types.get(i).equals("Integer")){
+                //fault
+                System.exit(2);
             }
-        } catch (IOException e){
-            e.printStackTrace();
         }
+        
+        for (int i=0;i<this.param.size();i++){
+            this.sum += (int)this.param.get(i);
+        }
+
     }
     public ArrayList<String> getTypes(){
         ArrayList<String> type = new ArrayList<String>();

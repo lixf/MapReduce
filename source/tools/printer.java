@@ -116,6 +116,32 @@ public class printer {
         System.out.println("exited printMapperRequest");
     }
     
+    public void printReducerRequest(String reducerName, Object reducerObj, ArrayList<Object> result,ArrayList<String> types) throws IOException {
+        System.out.println("entered printReducerRequest");
+        //hard code these
+        String xmlHeader = "<?xml version='1.0'?>\n<DataNodeJob>\n";
+        String yourType = "<reducer>\n";
+        String name = "<reducerName>"+reducerName+"</reducerName>\n";
+        String obj = "<reducerObj>"+bin2str(reducerObj)+"</reducerObj>\n";
+        String endType = "</reducer>\n";
+        
+        //input data
+        int numArgs = types.size();
+        String content = xmlHeader+yourType+name+obj+endType+"<params>\n";
+
+        for (int i=0;i<numArgs;i++) {
+            String paramXML = printOneParam(types.get(i),result.get(i));
+            //append the next parameter
+            content = content + paramXML;
+        }
+      
+        //append footer
+        content = content+"</params>\n"+"</DataNodeJob>";
+        this.xmlContent = content;
+        this.xmlLength = content.length();
+        System.out.println("exited printReducerRequest");
+    }
+    
     public void printXML(ArrayList<Object> params,ArrayList<String> types) throws IOException{
         
         System.out.println("entered printXML respond");
@@ -140,13 +166,13 @@ public class printer {
     private String printOneParam (String type, Object param){
         System.out.println("entered print one param");
         String stuff = "";
-        if (type.equals("int")){
-            stuff = ((Integer)param).toString();
+        if (type.equals("Integer")){
+            stuff = (param).toString();
             return "<param>\n<value><i4>"+stuff+"</i4></value>\n</param>\n";
-        } else if (type.equals("string")){
+        } else if (type.equals("String")){
             stuff = (String)param;
             return "<param>\n<value><string>"+stuff+"</string></value>\n</param>\n";
-        } else if (type.equals("boolean")){
+        } else if (type.equals("Boolean")){
             stuff = ((Boolean)param).toString();
             return "<param>\n<value><boolean>"+stuff+"</boolean></value>\n</param>\n";
         } else {
