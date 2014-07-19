@@ -1,4 +1,4 @@
-/**!@file CountMapper.java
+/**!@file SearchMapper.java
  *  @author Xiaofan Li
  *  @brief 
  */
@@ -12,23 +12,20 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 
-public class CountMapper implements Mapper{
+public class SearchMapper implements Mapper{
     
     private String data;
-    private int count;
+    private String key;
+    private boolean exist;
     private final static long serialVersionUID = 1;
 
-    public CountMapper(){
-        count = 0;
+    public SearchMapper(String key){
+        exist = false;
+        this.key = key;
     }
 
     public void setArgs(String data){
         this.data = data;
-    }
-
-    private int count_white(String input){
-        int white = input.length() - input.replaceAll(" ", "").length();
-        return (white +1);
     }
 
     public void run(){ 
@@ -36,9 +33,10 @@ public class CountMapper implements Mapper{
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(this.data)));
             String line;
             while ((line = reader.readLine()) !=null){
-                int curr = count_white(line);
-                this.count = this.count + curr;
-                System.out.println("count: "+count);
+              if (line.contains(this.key)){
+                this.exist = true;
+                return;
+              }
             }
         } catch (IOException e){
             e.printStackTrace();
@@ -47,13 +45,13 @@ public class CountMapper implements Mapper{
 
     public ArrayList<String> getTypes(){
         ArrayList<String> type = new ArrayList<String>();
-        type.add("Integer");
+        type.add("Boolean");
         return type;
     }
 
     public ArrayList<Object> getResult(){
         ArrayList<Object> res = new ArrayList<Object>();
-        res.add(Integer.valueOf(this.count));
+        res.add((Boolean)this.exist);
         return res;
     }
 }

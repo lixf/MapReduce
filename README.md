@@ -2,6 +2,7 @@ MapReduce
 =========
 
 f0r 15440
+t3am M3m3m6eR: Xiaofan Li
 
 1. Overview
 ----------------------------------------------------------------------------
@@ -28,8 +29,8 @@ source/tools/ has the following useful tools:
 
 iv> source/client provides the following builtin testing objects:
     a) count: counts the number of words in data/book.txt
-    b) 
-    c)
+    b) search: looks for a specific substring
+
 
 3. Testing
 ----------------------------------------------------------------------------
@@ -58,6 +59,10 @@ iii> Currently supports operation on integer, boolean and string.
 iv> Extensive logging records each and every message according to its time
 of receipt. 
 
+v> Simple DFS will work without AFS support.
+
+vi> Objects are compressed using base 64 encoding to limit bandwidth usage.
+
 5. Design
 ----------------------------------------------------------------------------
 After the name node and data nodes are up and found each other according to the
@@ -83,6 +88,19 @@ improved in the following ways:
     the name node. A malicious client could upload a destructive object and 
     cause the server to segfault or memory dump.
 
-    b) 
+    b) Multithreading: After some careful consideration, I decided not to 
+    implement the servers in a multithreaded fashion because: Java only supports
+    threading on an object which requires copying of all the shared data. This
+    will make concurrency control a real pain. However, this is absolutely
+    possible to add in the project as a feature because all the core parts
+    of the system are implemented as a Runnable object. 
+
+    c) Better DFS: Right now the file system is really dumb because it just
+    saves the data in ./data/ directory and makes a copy of the file with its
+    own index as a tag. Although this will work without AFS (since files are
+    transmitted), this is not very intelligent and does not care about version
+    control at all.
+
+    
 
 

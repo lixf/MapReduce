@@ -190,6 +190,61 @@ public class nameNodeServer implements Runnable {
       }
     }
 
+    public static int countLines(String filename) {
+        int count = 0;
+        int readChars = 0;
+        boolean empty = true;
+        
+        try {
+            InputStream is = new BufferedInputStream(new FileInputStream(filename));
+            byte[] c = new byte[1024];
+            while ((readChars = is.read(c)) != -1) {
+                empty = false;
+                for (int i = 0; i < readChars; ++i) {
+                    if (c[i] == '\n') {
+                        ++count;
+                    }
+                }
+            }
+            
+            is.close();
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        return (count == 0 && !empty) ? 1 : count;
+    }
+
+    //generate new file name for data
+    private String split_name(int index){
+        int period = this.data.indexOf('.');
+        String first = this.data.substring(0,period);
+        String second = this.data.substring(period,this.data.length());
+        return (first+"_"+index+second);
+    }
+
+    //function to split the data and create data for each data node 
+    //and put the file in ./data/ for transmission
+    private void split_data(BufferedReader input,int num_mapper,int each_lines){
+        String temp;
+        try{
+            for (int index=0;index<num_mapper;index++){
+                int count = 0;
+                String new_path = split_name(index);
+                File new_data = new File("../data/"+new_path);
+                PrintWriter file = new PrintWriter(new_data);
+                while(count<each_lines && ((temp = input.readLine())!=null)){
+                    file.println(temp);
+                    count++;
+                }
+                System.out.println("spliting data: "+ new_path);
+                file.close();
+            }
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+    }
+
+
     //parses and handles the request
     //send the mapper and reduce to data nodes and keep record
     private void handleMapper() {
@@ -203,6 +258,29 @@ public class nameNodeServer implements Runnable {
         for (int i=0;i<dataNodeAdr.size();i++) {
             //just use all nodes
             current.add(i);
+        }
+        int num_mapper = current.size();
+        
+        //split the data
+        String datapath = "../data/"+this.data;
+        int tot_lines = countLines(datapath);
+        System.out.println("spliting data tot line: "+ tot_lines);
+        int each_lines = 0;
+        if (tot_lines%num_mapper == 0){
+            each_lines = tot_lines/num_mapper;
+        } else {
+            each_lines = (tot_lines/num_mapper) + 1;
+        }
+        System.out.println("spliting data each line: "+ each_lines);
+        try {
+            InputStream dataStream = new FileInputStream("../data/"+this.data);
+            BufferedReader in = new BufferedReader(new InputStreamReader(dataStream));
+
+            split_data(in,num_mapper,each_lines);
+            
+            dataStream.close();
+        } catch (IOException e){
+            e.printStackTrace();
         }
         
         //send the requests to each node

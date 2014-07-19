@@ -7,3 +7,5 @@ NameNodeIP :128.2.13.133
           //unix1
 DataNodeIP :128.2.13.137
           //unix4
+DataNodeIP :128.2.13.161
+          //unix3

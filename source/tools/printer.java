@@ -71,7 +71,21 @@ public class printer {
         int period = data.indexOf('.');
         String first = data.substring(0,period);
         String second = data.substring(period,data.length());
-        return (first+"_"+index+second);
+        String dataName = (first+"_"+index+second);
+        String content,temp;
+        content = "";
+        
+        try {
+            InputStream dataStream = new FileInputStream("../data/"+dataName);
+            BufferedReader in = new BufferedReader(new InputStreamReader(dataStream));
+            while((temp=in.readLine())!=null){
+                content = content+"\n"+temp;
+            }
+        } catch (IOException e){
+            e.printStackTrace();
+        }
+        return "<data-name>"+dataName+"</data-name>\n"+"<data-content>"+content+"</data-content>\n";
+
     }   
     
     public void printClientRequest(String mapperName, Object mapperObj, String reducerName,Object reducerObj, String data) throws IOException {
@@ -107,7 +121,7 @@ public class printer {
         String name = "<mapperName>"+mapperName+"</mapperName>\n";
         String obj = "<mapperObj>"+bin2str(mapperObj)+"</mapperObj>\n";
         String endType = "</mapper>\n";
-        String yourData = "<data>"+divData(data,index)+"</data>\n";
+        String yourData = "<data>\n"+divData(data,index)+"</data>\n";
       
         //append footer
         content = xmlHeader+yourType+name+obj+endType+yourData+"</DataNodeJob>";
@@ -173,7 +187,7 @@ public class printer {
             stuff = (String)param;
             return "<param>\n<value><string>"+stuff+"</string></value>\n</param>\n";
         } else if (type.equals("Boolean")){
-            stuff = ((Boolean)param).toString();
+            stuff = param.toString();
             return "<param>\n<value><boolean>"+stuff+"</boolean></value>\n</param>\n";
         } else {
             return stuff;

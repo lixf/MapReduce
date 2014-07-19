@@ -88,7 +88,6 @@ public class MapReduceClient {
             //read response
             System.out.println("going to read response");
             while(!in.ready()){}
-            System.out.println("in socket ready");
             //for debugging and logging, write the stream to a file
             String path2 = "../data/"+serial+"_response"+".mix";
             File log2 = new File(path2);
@@ -96,7 +95,6 @@ public class MapReduceClient {
             
             while(!(temp = in.readLine()).contains("/Response")){
                 save2.println(temp);
-                System.out.println(temp);
             }
             save2.println(temp);
             save2.close();

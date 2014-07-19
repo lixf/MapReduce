@@ -34,6 +34,7 @@ public class XmlParser {
   private Object reducerObj;
   private String data;
   private boolean isMapper;
+  private boolean dataNode;
 
   public XmlParser(InputStream is) {
     reader = new BufferedReader(new InputStreamReader(is));
@@ -67,10 +68,12 @@ public class XmlParser {
         //catch method call
         if (line.substring(indexFront,indexBack).equals("job")){
             //just use handler
+            this.dataNode = false;
             ret = parseJob();
         }
         else if (line.substring(indexFront,indexBack).equals("DataNodeJob")){
             //just use handler
+            this.dataNode = true;
             ret = parseDataNodeJob();
         }
         else {
@@ -199,24 +202,51 @@ public class XmlParser {
   }
 
   private void parseData() throws IOException{
-    System.out.println("paring data path");
-    int ret, indexFront,indexBack, i;
-    String line;
+    if(this.dataNode){
+        
+        int ret, indexFront,indexBack, i;
+        String line;
 
-    //skip a line
-    line = reader.readLine();
-    line = reader.readLine();
+        //skip two lines
+        line = reader.readLine();
+        line = reader.readLine();
+        line = reader.readLine();
 
-    indexFront = line.indexOf('>') + 1;
-    indexBack  = line.indexOf('/') - 1;
+        indexFront = line.indexOf('>') + 1;
+        indexBack  = line.indexOf('/') - 1;
 
-    this.data = line.substring(indexFront,indexBack);
+        this.data = line.substring(indexFront,indexBack);
+
+        //write the rest to file
+        File save = new File("../data/"+this.data);
+        try{
+            PrintWriter f = new PrintWriter(save);
+            while (!(line=reader.readLine()).contains("</data-content>")){
+                f.println(line);
+            }
+            f.close();
+         } catch (IOException e){
+            e.printStackTrace();
+         }
+    }
+    else{
+        int ret, indexFront,indexBack, i;
+        String line;
+
+        //skip a line
+        line = reader.readLine();
+        line = reader.readLine();
+
+        indexFront = line.indexOf('>') + 1;
+        indexBack  = line.indexOf('/') - 1;
+
+        this.data = line.substring(indexFront,indexBack);
+    }
   }
 
 
   //return int non-zero for error  
   public int parseResponse() throws IOException {
-    System.out.println("parsing response");
     String initial, prms[], cmd[], temp[];
     int ret, indexFront,indexBack, i;
     ret = 0;
@@ -287,7 +317,6 @@ public class XmlParser {
 
 
   private int parseParams() throws IOException{
-    System.out.println("parsing params");
     int ret, indexFront,indexBack, i;
     String line;
     ret = 0;
@@ -319,7 +348,6 @@ public class XmlParser {
 
 
   private int parseOneParam() throws IOException{
-    System.out.println("parsing one param");
     int ret, indexFront,indexBack, i;
     String line;
     

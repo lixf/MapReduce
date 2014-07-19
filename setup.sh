@@ -63,15 +63,13 @@ function runnamenode {
 function runclient {
     #run client with command prompt
     echo -e "${green}starting client${NC}"
-    echo -e "${green}please choose from sum/mult/fib/con${NC}"
+    echo -e "${green}please choose from sum/search :)${NC}"
     read choice
     cd $BINARY_SOURCE
     case "$choice" in
     sum)    java JavaClientSum; exit 0;;
-    mult)   java JavaClientMult; exit 0;;
-    fib)    java JavaClientFib; exit 0;;
-    con)    java JavaClientCon; exit 0;;
-    *)      echo ${red}please choose from sum/mult/fib/con${NC}; exit 0;;
+    search)    java JavaClientSearch; exit 0;;
+    *)      echo ${red}please choose from sum/search${NC}; exit 0;;
     esac
 }
 

@@ -106,8 +106,6 @@ public class dataNodeServer implements Runnable {
                 } else {
                     this.result = this.p.getParams();
                     this.types = this.p.getTypes();
-                System.out.println((int)this.result.get(0));
-
                 }
                 System.out.println("data-node: finished parsing request");
 
